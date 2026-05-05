@@ -86,18 +86,22 @@ public class TaskService {
             throw new BusinessException("该任务已被接取");
         }
 
-        User accepter = userRepository.findById(userId)
-                .orElseThrow(() -> new BusinessException("用户不存在"));
-
         if (task.getPublisher().getId().equals(userId)) {
             throw new BusinessException("不能接取自己发布的任务");
         }
 
-        // 乐观锁：仅在状态仍为PENDING时更新
-        task.setStatus(TaskStatus.IN_PROGRESS);
-        task.setAccepter(accepter);
-        task = taskRepository.save(task);
+        User accepter = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException("用户不存在"));
 
+        // 原子更新：仅在 status 仍为 PENDING 时才更新成功
+        int updated = taskRepository.tryAccept(taskId, accepter, TaskStatus.IN_PROGRESS, TaskStatus.PENDING);
+        if (updated == 0) {
+            throw new BusinessException("该任务已被其他用户接取");
+        }
+
+        // 重新查询以获取最新状态
+        task = taskRepository.findById(taskId)
+                .orElseThrow(() -> new BusinessException("任务不存在"));
         return TaskDTO.fromEntity(task);
     }
 

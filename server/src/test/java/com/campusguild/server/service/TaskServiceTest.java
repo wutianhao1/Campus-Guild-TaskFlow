@@ -135,13 +135,23 @@ class TaskServiceTest {
     @Test
     void acceptTask_Success() {
         testTask.setStatus(TaskStatus.PENDING);
-        when(taskRepository.findById(1L)).thenReturn(Optional.of(testTask));
+        // 第二次 findById 应返回已接取状态
+        Task acceptedTask = new Task();
+        acceptedTask.setId(1L);
+        acceptedTask.setTitle("测试任务");
+        acceptedTask.setDescription("任务描述");
+        acceptedTask.setCategory("跑腿");
+        acceptedTask.setReward(50);
+        acceptedTask.setStatus(TaskStatus.IN_PROGRESS);
+        acceptedTask.setPublisher(publisher);
+        acceptedTask.setAccepter(accepter);
+        acceptedTask.setViews(0);
+
+        when(taskRepository.findById(1L))
+                .thenReturn(Optional.of(testTask))
+                .thenReturn(Optional.of(acceptedTask));
         when(userRepository.findById(2L)).thenReturn(Optional.of(accepter));
-        when(taskRepository.save(any(Task.class))).thenAnswer(inv -> {
-            Task t = inv.getArgument(0);
-            t.setStatus(TaskStatus.IN_PROGRESS);
-            return t;
-        });
+        when(taskRepository.tryAccept(1L, accepter, TaskStatus.IN_PROGRESS, TaskStatus.PENDING)).thenReturn(1);
 
         TaskDTO result = taskService.acceptTask(1L, 2L);
 
@@ -162,9 +172,22 @@ class TaskServiceTest {
     }
 
     @Test
+    void acceptTask_ConcurrentTake_ThrowsException() {
+        testTask.setStatus(TaskStatus.PENDING);
+        when(taskRepository.findById(1L)).thenReturn(Optional.of(testTask));
+        when(userRepository.findById(2L)).thenReturn(Optional.of(accepter));
+        when(taskRepository.tryAccept(1L, accepter, TaskStatus.IN_PROGRESS, TaskStatus.PENDING)).thenReturn(0);
+
+        BusinessException exception = assertThrows(BusinessException.class, () -> {
+            taskService.acceptTask(1L, 2L);
+        });
+
+        assertEquals("该任务已被其他用户接取", exception.getMessage());
+    }
+
+    @Test
     void acceptTask_SelfTask_ThrowsException() {
         when(taskRepository.findById(1L)).thenReturn(Optional.of(testTask));
-        when(userRepository.findById(1L)).thenReturn(Optional.of(publisher));
 
         BusinessException exception = assertThrows(BusinessException.class, () -> {
             taskService.acceptTask(1L, 1L);
