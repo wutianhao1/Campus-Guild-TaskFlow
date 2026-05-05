@@ -44,6 +44,15 @@ public class PointsService {
     }
 
     /**
+     * 退还积分（任务取消时）
+     */
+    @Transactional
+    public void refundPoints(User user, int amount) {
+        user.setPoints(user.getPoints() + amount);
+        userRepository.save(user);
+    }
+
+    /**
      * 查询用户信息（含积分/等级）
      */
     public User getUserInfo(Long userId) {

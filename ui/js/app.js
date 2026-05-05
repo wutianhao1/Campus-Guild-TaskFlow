@@ -1,39 +1,150 @@
-const API_BASE = 'http://localhost:8080/api';
+const API_BASE = window.API_BASE || '/api';
 
 const state = {
   currentPage: 'login',
   user: null,
+  token: null,
   tasks: [],
   filterStatus: 'all',
   searchQuery: '',
+  category: '',
   showUserMenu: false,
   profileTab: 'published',
+  page: 0,
+  totalPages: 0,
+  loading: false,
 };
 
-const mockTasks = [
-  { id: 1, title: '帮忙代取快递到宿舍', description: '从南门菜鸟驿站取一个中等大小的包裹送到8号楼302', publisher: '张三', reward: 15, status: 'PENDING', timeAgo: '10分钟前', views: 24 },
-  { id: 2, title: '帮忙打印复习资料', description: '图书馆二楼打印店，打印约30页的复习资料，双面', publisher: '李四', reward: 10, status: 'PENDING', timeAgo: '25分钟前', views: 42 },
-  { id: 3, title: 'Python代码调试求助', description: '爬虫项目遇到问题，requests库返回状态码403，需要帮忙解决', publisher: '王五', reward: 25, status: 'IN_PROGRESS', timeAgo: '1小时前', views: 89 },
-  { id: 4, title: '二手自行车出售', description: '九成新山地车，骑行半年，因毕业出售，价格可议', publisher: '赵六', reward: 200, status: 'PENDING', timeAgo: '2小时前', views: 156 },
-  { id: 5, title: '帮忙占自习室座位', description: '明天早上7点需要去图书馆3楼占一个靠窗的位置', publisher: '小明', reward: 8, status: 'PENDING', timeAgo: '3小时前', views: 67 },
-  { id: 6, title: '高数作业辅导', description: '微积分下册第5章习题，需要详细解答过程', publisher: '小红', reward: 30, status: 'COMPLETED', timeAgo: '5小时前', views: 203 },
-];
+const api = {
+  async request(endpoint, options = {}) {
+    const url = `${API_BASE}${endpoint}`;
+    const headers = {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    };
+    if (state.token) {
+      headers['Authorization'] = `Bearer ${state.token}`;
+    }
+    const response = await fetch(url, { ...options, headers });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.message || '请求失败');
+    }
+    return data.data;
+  },
+
+  post(endpoint, body) {
+    return this.request(endpoint, { method: 'POST', body: JSON.stringify(body) });
+  },
+
+  get(endpoint) {
+    return this.request(endpoint);
+  },
+};
+
+const apiAuth = {
+  login(username, password) {
+    return api.post('/auth/login', { username, password });
+  },
+  register(username, password, nickname) {
+    return api.post('/auth/register', { username, password, nickname });
+  },
+};
+
+const apiTasks = {
+  browse(page = 0, pageSize = 10, keyword = '', category = '') {
+    const params = new URLSearchParams({ page, pageSize });
+    if (keyword) params.append('keyword', keyword);
+    if (category) params.append('category', category);
+    return api.get(`/tasks?${params}`);
+  },
+  publish(title, description, category, reward) {
+    return api.post('/tasks', { title, description, category, reward });
+  },
+  accept(taskId) {
+    return api.post(`/tasks/${taskId}/accept`, {});
+  },
+  complete(taskId) {
+    return api.post(`/tasks/${taskId}/complete`, {});
+  },
+  cancel(taskId) {
+    return api.post(`/tasks/${taskId}/cancel`, {});
+  },
+  getDetail(taskId) {
+    return api.get(`/tasks/${taskId}`);
+  },
+  incrementViews(taskId) {
+    return api.post(`/tasks/${taskId}/views`, {});
+  },
+  myPublished(page = 0, pageSize = 10) {
+    return api.get(`/tasks/my/published?page=${page}&pageSize=${pageSize}`);
+  },
+  myAccepted(page = 0, pageSize = 10) {
+    return api.get(`/tasks/my/accepted?page=${page}&pageSize=${pageSize}`);
+  },
+};
 
 const levelNames = ['新手', '见习', '冒险者', '精英', '勇士', '骑士', '领主', '传奇'];
 const statusConfig = {
-  PENDING: { label: '待接取', className: 'badge-pending' },
-  IN_PROGRESS: { label: '进行中', className: 'badge-progress' },
-  COMPLETED: { label: '已完成', className: 'badge-completed' },
+  '待接取': { label: '待接取', className: 'badge-pending' },
+  '进行中': { label: '进行中', className: 'badge-progress' },
+  '已完成': { label: '已完成', className: 'badge-completed' },
+  '已取消': { label: '已取消', className: 'badge-cancelled' },
 };
 
-function init() {
+async function init() {
   const savedUser = localStorage.getItem('user');
-  if (savedUser) {
+  const savedToken = localStorage.getItem('token');
+  if (savedUser && savedToken) {
     state.user = JSON.parse(savedUser);
+    state.token = savedToken;
     state.currentPage = 'dashboard';
+    await loadTasks();
   }
-  state.tasks = [...mockTasks];
   render();
+  bindEvents();
+}
+
+function bindEvents() {
+  document.querySelectorAll('[data-action]').forEach(el => {
+    const action = el.dataset.action;
+    el.addEventListener('click', function() {
+      if (action === 'openTaskDetail') {
+        openTaskDetail(el.dataset.id);
+      } else if (action === 'handleAcceptTask') {
+        handleAcceptTask(parseInt(el.dataset.id));
+      } else if (action === 'handleCompleteTask') {
+        handleCompleteTask(parseInt(el.dataset.id));
+      } else if (action === 'handleCancelTask') {
+        handleCancelTask(parseInt(el.dataset.id));
+      } else if (action === 'navigate') {
+        navigate(el.dataset.page);
+      } else if (action === 'handleLogout') {
+        handleLogout();
+      } else if (action === 'toggleUserMenu') {
+        toggleUserMenu();
+      } else if (action === 'selectCategory') {
+        selectCategory(el, el.dataset.category);
+      } else if (action === 'setReward') {
+        setReward(parseInt(el.dataset.value));
+      } else if (action === 'setProfileTab') {
+        state.profileTab = el.dataset.tab;
+        render();
+      } else if (action === 'setCategory') {
+        state.category = el.dataset.key;
+        state.page = 0;
+        loadTasks();
+      }
+    });
+  });
+  
+  const searchInput = document.getElementById('search-input');
+  if (searchInput) {
+    searchInput.addEventListener('input', function() {
+      state.searchQuery = this.value;
+      loadTasks();
+    });
+  }
 }
 
 function navigate(page, params = {}) {
@@ -43,31 +154,71 @@ function navigate(page, params = {}) {
   render();
 }
 
-function saveUser(user) {
+function saveUser(user, token) {
   state.user = user;
+  state.token = token;
   localStorage.setItem('user', JSON.stringify(user));
+  localStorage.setItem('token', token);
 }
 
-function logout() {
+function clearSession() {
   state.user = null;
+  state.token = null;
+  state.tasks = [];
   localStorage.removeItem('user');
+  localStorage.removeItem('token');
+}
+
+async function handleLogout(e) {
+  if (e) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+  try {
+    await api.post('/auth/logout', {});
+  } catch (err) {
+  }
+  clearSession();
   navigate('login');
 }
 
-function login(username, password) {
-  const user = { username, points: 100, level: 1 };
-  saveUser(user);
-  navigate('dashboard');
+async function loadTasks() {
+  state.loading = true;
+  render();
+  try {
+    const result = await apiTasks.browse(state.page, 10, state.searchQuery, state.category);
+    state.tasks = result.items;
+    state.totalPages = result.totalPages;
+  } catch (e) {
+    showError(e.message);
+  } finally {
+    state.loading = false;
+    render();
+  }
 }
 
-function register(username, password) {
-  const user = { username, points: 100, level: 1 };
-  saveUser(user);
-  navigate('dashboard');
+function showError(message, elementId = 'error-message') {
+  const el = document.getElementById(elementId);
+  if (el) {
+    el.textContent = message;
+    el.style.display = 'block';
+    setTimeout(() => el.style.display = 'none', 3000);
+  }
 }
 
 function svgIcon(path, className = 'w-5 h-5') {
   return `<svg class="${className}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="${path}"/></svg>`;
+}
+
+function formatTimeAgo(dateString) {
+  if (!dateString) return '刚刚';
+  const date = new Date(dateString);
+  const now = new Date();
+  const diff = Math.floor((now - date) / 1000);
+  if (diff < 60) return '刚刚';
+  if (diff < 3600) return `${Math.floor(diff / 60)}分钟前`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}小时前`;
+  return `${Math.floor(diff / 86400)}天前`;
 }
 
 function renderNavbar() {
@@ -82,13 +233,13 @@ function renderNavbar() {
     <nav class="navbar">
       <div class="container">
         <div class="navbar-inner">
-          <a href="#" class="navbar-logo" onclick="navigate('dashboard');return false;">
+          <a href="#" class="navbar-logo" data-action="navigate" data-page="dashboard">
             <div class="navbar-logo-icon gradient-campus">${svgIcon('M13 10V3L4 14h7v7l9-11h-7z', 'w-5 h-5 text-white')}</div>
             <span class="navbar-logo-text">TaskFlow</span>
           </a>
           <div class="navbar-nav">
             ${navItems.map(item => `
-              <a href="#" class="navbar-nav-item ${state.currentPage === item.page ? 'active' : ''}" onclick="navigate('${item.page}');return false;">
+              <a href="#" class="navbar-nav-item ${state.currentPage === item.page ? 'active' : ''}" data-action="navigate" data-page="${item.page}">
                 ${svgIcon(item.icon)} ${item.label}
               </a>
             `).join('')}
@@ -99,7 +250,7 @@ function renderNavbar() {
               <span class="navbar-points-value">${state.user.points || 0}</span>
             </div>
             <div class="navbar-user">
-              <button class="navbar-user-btn" onclick="state.showUserMenu=!state.showUserMenu;render();">
+              <button class="navbar-user-btn" data-action="toggleUserMenu">
                 <div class="navbar-user-avatar gradient-campus">${initial}</div>
                 <span class="navbar-user-name">${state.user.username}</span>
               </button>
@@ -107,10 +258,10 @@ function renderNavbar() {
                 <div class="navbar-user-menu">
                   <div class="navbar-user-menu-header">
                     <div class="navbar-user-menu-name">${state.user.username}</div>
-                    <div class="navbar-user-menu-level">Lv.${state.user.level || 1} · ${state.user.points || 0} 积分</div>
+                    <div class="navbar-user-menu-level">Lv.${state.user.guildLevel || 1} · ${state.user.points || 0} 积分</div>
                   </div>
-                  <button class="navbar-user-menu-item" onclick="navigate('profile')">个人中心</button>
-                  <button class="navbar-user-menu-item logout" onclick="logout()">退出登录</button>
+                  <button class="navbar-user-menu-item" data-action="navigate" data-page="profile">个人中心</button>
+                  <button class="navbar-user-menu-item logout" data-action="handleLogout">退出登录</button>
                 </div>
               ` : ''}
             </div>
@@ -121,7 +272,7 @@ function renderNavbar() {
         <div class="container">
           <div class="navbar-mobile-nav">
             ${navItems.map(item => `
-              <a href="#" class="navbar-mobile-item ${state.currentPage === item.page ? 'active' : ''}" onclick="navigate('${item.page}');return false;">
+              <a href="#" class="navbar-mobile-item ${state.currentPage === item.page ? 'active' : ''}" data-action="navigate" data-page="${item.page}">
                 ${svgIcon(item.icon, 'w-5 h-5')}
                 <span>${item.label}</span>
               </a>
@@ -134,19 +285,19 @@ function renderNavbar() {
 }
 
 function renderTaskCard(task) {
-  const status = statusConfig[task.status] || statusConfig.PENDING;
-  const initial = task.publisher?.charAt(0).toUpperCase() || 'U';
+  const status = statusConfig[task.status] || statusConfig['待接取'];
+  const initial = task.publisherNickname?.charAt(0).toUpperCase() || 'U';
   return `
-    <div class="task-card card animate-slide-up" onclick="navigate('taskDetail',{id:${task.id}})">
+    <div class="task-card card animate-slide-up">
       <div class="task-card-header">
         <h3 class="task-card-title">${task.title}</h3>
         <span class="badge ${status.className}">${status.label}</span>
       </div>
-      <p class="task-card-desc">${task.description}</p>
+      <p class="task-card-desc">${task.description || ''}</p>
       <div class="task-card-footer">
         <div class="task-card-publisher">
           <div class="task-card-avatar gradient-campus">${initial}</div>
-          <span class="task-card-publisher-name">${task.publisher}</span>
+          <span class="task-card-publisher-name">${task.publisherNickname}</span>
         </div>
         <div class="task-card-reward">
           ${svgIcon('M10 2a1 1 0 011 1v1.323l3.954 1.582 1.599-.8a1 1 0 01.894 1.79l-1.233.616 1.738 5.42a1 1 0 01-.285 1.05A3.989 3.989 0 0115 15a3.989 3.989 0 01-2.667-1.019 1 1 0 01-.285-1.05l1.715-5.349L11 6.477V16h2a1 1 0 110 2H7a1 1 0 110-2h2V6.477L6.237 7.582l1.715 5.349a1 1 0 01-.285 1.05A3.989 3.989 0 015 15a3.989 3.989 0 01-2.667-1.019 1 1 0 01-.285-1.05l1.738-5.42-1.233-.617a1 1 0 01.894-1.788l1.599.799L9 4.323V3a1 1 0 011-1z', 'w-4 h-4')}
@@ -154,9 +305,10 @@ function renderTaskCard(task) {
         </div>
       </div>
       <div class="task-card-meta">
-        <span class="task-card-meta-item">${svgIcon('M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', 'w-3.5 h-3.5')} ${task.timeAgo}</span>
-        <span class="task-card-meta-item">${svgIcon('M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z', 'w-3.5 h-3.5')} ${task.views}</span>
+        <span class="task-card-meta-item">${svgIcon('M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', 'w-3.5 h-3.5')} ${formatTimeAgo(task.createdAt)}</span>
+        <span class="task-card-meta-item">${svgIcon('M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z', 'w-3.5 h-3.5')} ${task.views || 0}</span>
       </div>
+      <button class="task-card-btn" data-action="openTaskDetail" data-id="${task.id}">查看详情</button>
     </div>
   `;
 }
@@ -171,7 +323,7 @@ function renderLoginPage() {
           <p>登录你的 Campus Guild 账号</p>
         </div>
         <div class="login-card card animate-slide-up">
-          <form class="login-form" onsubmit="handleLogin(event)">
+          <form class="login-form" id="login-form" onsubmit="handleLogin(event)">
             <div>
               <label class="login-form-label">用户名</label>
               <input type="text" id="login-username" class="input-field" placeholder="请输入用户名" required>
@@ -180,10 +332,11 @@ function renderLoginPage() {
               <label class="login-form-label">密码</label>
               <input type="password" id="login-password" class="input-field" placeholder="请输入密码" required>
             </div>
-            <button type="submit" class="btn-primary">登录</button>
+            <div id="login-error" class="error-message" style="display:none;"></div>
+            <button type="submit" class="btn-primary" id="login-btn">登录</button>
           </form>
           <div class="login-footer">
-            <p class="login-footer-text">还没有账号？ <a href="#" class="login-footer-link" onclick="navigate('register');return false;">立即注册</a></p>
+            <p class="login-footer-text">还没有账号？ <a href="#" class="login-footer-link" data-action="navigate" data-page="register">立即注册</a></p>
           </div>
         </div>
         <div class="login-copyright">Campus Guild TaskFlow © 2026</div>
@@ -203,10 +356,14 @@ function renderRegisterPage() {
         </div>
         <div class="login-card card animate-slide-up">
           <div id="register-error" class="error-message" style="display:none;"></div>
-          <form class="login-form" onsubmit="handleRegister(event)">
+          <form class="login-form" id="register-form" onsubmit="handleRegister(event)">
             <div>
               <label class="login-form-label">用户名</label>
               <input type="text" id="reg-username" class="input-field" placeholder="请输入用户名" required>
+            </div>
+            <div>
+              <label class="login-form-label">昵称</label>
+              <input type="text" id="reg-nickname" class="input-field" placeholder="请输入昵称" required>
             </div>
             <div>
               <label class="login-form-label">密码</label>
@@ -219,7 +376,7 @@ function renderRegisterPage() {
             <button type="submit" class="btn-primary">注册</button>
           </form>
           <div class="login-footer">
-            <p class="login-footer-text">已有账号？ <a href="#" class="login-footer-link" onclick="navigate('login');return false;">立即登录</a></p>
+            <p class="login-footer-text">已有账号？ <a href="#" class="login-footer-link" data-action="navigate" data-page="login">立即登录</a></p>
           </div>
         </div>
         <div class="login-copyright">Campus Guild TaskFlow © 2026</div>
@@ -228,22 +385,14 @@ function renderRegisterPage() {
   `;
 }
 
-function renderDashboardPage() {
-  const filtered = state.tasks.filter(task => {
-    const matchSearch = task.title.toLowerCase().includes(state.searchQuery.toLowerCase()) || task.description.toLowerCase().includes(state.searchQuery.toLowerCase());
-    const matchFilter = state.filterStatus === 'all' || task.status === state.filterStatus;
-    return matchSearch && matchFilter;
-  });
-  const stats = [
-    { label: '进行中任务', value: '12', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', gradient: 'from-[var(--campus-400)] to-[var(--campus-600)]' },
-    { label: '已完成', value: '47', icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z', gradient: 'from-[var(--leaf-400)] to-[var(--leaf-600)]' },
-    { label: '获得积分', value: '320', icon: 'M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z', gradient: 'from-[var(--amber-400)] to-[var(--amber-600)]' },
-  ];
+async function renderDashboardPage() {
   const filterBtns = [
-    { key: 'all', label: '全部' },
-    { key: 'PENDING', label: '待接取' },
-    { key: 'IN_PROGRESS', label: '进行中' },
-    { key: 'COMPLETED', label: '已完成' },
+    { key: '', label: '全部' },
+    { key: 'delivery', label: '代拿代送' },
+    { key: 'tech', label: '技术求助' },
+    { key: 'study', label: '学习辅导' },
+    { key: 'secondhand', label: '二手交易' },
+    { key: 'other', label: '其他' },
   ];
   return `
     <div class="page">
@@ -253,33 +402,26 @@ function renderDashboardPage() {
           <h1>任务大厅</h1>
           <p>浏览并接取感兴趣的校园任务</p>
         </div>
-        <div class="stats-grid">
-          ${stats.map((s, i) => `
-            <div class="stat-card card animate-slide-up" style="animation-delay:${i * 0.1}s">
-              <div class="stat-icon gradient-campus">${svgIcon(s.icon, 'w-6 h-6')}</div>
-              <div>
-                <div class="stat-value">${s.value}</div>
-                <div class="stat-label">${s.label}</div>
-              </div>
-            </div>
-          `).join('')}
-        </div>
         <div class="filter-bar card animate-slide-up" style="animation-delay:0.2s">
           <div class="filter-bar-inner">
             <div class="search-wrapper">
               ${svgIcon('M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z', 'w-5 h-5')}
-              <input type="text" class="input-field search-input" placeholder="搜索任务..." value="${state.searchQuery}" oninput="state.searchQuery=this.value;render();">
+              <input type="text" class="input-field search-input" placeholder="搜索任务..." value="${state.searchQuery}" oninput="state.searchQuery=this.value;loadTasks();">
             </div>
             <div class="filter-buttons">
               ${filterBtns.map(btn => `
-                <button class="filter-btn ${state.filterStatus === btn.key ? 'active' : ''}" onclick="state.filterStatus='${btn.key}';render();">${btn.label}</button>
+                <button class="filter-btn ${state.category === btn.key ? 'active' : ''}" data-action="setCategory" data-key="${btn.key}">${btn.label}</button>
               `).join('')}
             </div>
           </div>
         </div>
-        ${filtered.length > 0 ? `
+        ${state.loading ? `
+          <div class="card empty-state">
+            <p>加载中...</p>
+          </div>
+        ` : state.tasks.length > 0 ? `
           <div class="tasks-grid">
-            ${filtered.map((task, i) => renderTaskCard(task)).join('')}
+            ${state.tasks.map((task, i) => renderTaskCard(task)).join('')}
           </div>
         ` : `
           <div class="card empty-state">
@@ -292,31 +434,58 @@ function renderDashboardPage() {
   `;
 }
 
-function renderTaskDetailPage() {
-  const task = state.tasks.find(t => t.id === state.pageParams?.id) || state.tasks[0];
+async function viewTaskDetail(taskId) {
+  try {
+    const task = await apiTasks.getDetail(taskId);
+    state.currentTask = task;
+    state.currentPage = 'taskDetail';
+    render();
+  } catch (e) {
+    console.error('viewTaskDetail error:', e);
+  }
+}
+
+async function renderTaskDetailPage() {
+  const task = state.currentTask;
+  if (!task) {
+    return renderDashboardPage();
+  }
   const status = statusConfig[task.status];
-  const initial = task.publisher?.charAt(0).toUpperCase() || 'U';
+  const initial = task.publisherNickname?.charAt(0).toUpperCase() || 'U';
   let actionHtml = '';
-  if (task.status === 'PENDING') {
-    actionHtml = `<button class="btn-success" onclick="handleAcceptTask(${task.id})">接取任务</button>`;
-  } else if (task.status === 'IN_PROGRESS') {
-    actionHtml = `<button class="btn-primary" onclick="handleCompleteTask(${task.id})">确认完成</button>`;
+  if (task.status === '待接取') {
+    if (task.publisherId === state.user.id) {
+      actionHtml = `<div class="detail-progress">这是你发布的任务，等待他人接取</div>
+                    <button class="btn-secondary" data-action="handleCancelTask" data-id="${task.id}">取消任务</button>`;
+    } else {
+      actionHtml = `<button class="btn-success" data-action="handleAcceptTask" data-id="${task.id}">接取任务</button>`;
+    }
+  } else if (task.status === '进行中') {
+    if (task.publisherId === state.user.id) {
+      actionHtml = `<button class="btn-primary" data-action="handleCompleteTask" data-id="${task.id}">确认完成</button>
+                    <button class="btn-secondary" data-action="handleCancelTask" data-id="${task.id}">取消任务</button>`;
+    } else if (task.accepterId === state.user.id) {
+      actionHtml = `<div class="detail-progress">你已接取此任务，请尽快完成</div>`;
+    } else {
+      actionHtml = `<div class="detail-progress">任务进行中...</div>`;
+    }
   } else {
-    actionHtml = `<div class="detail-completed">任务已完成</div>`;
+    actionHtml = `<div class="detail-completed">${status?.label || task.status}</div>`;
   }
   return `
     <div class="page">
       ${renderNavbar()}
       <div class="container page-content">
-        <button class="back-btn" onclick="navigate('dashboard')">${svgIcon('M15 19l-7-7 7-7')} 返回</button>
+        <button class="back-btn" data-action="navigate" data-page="dashboard">${svgIcon('M15 19l-7-7 7-7')} 返回</button>
+        <div id="detail-message" class="error-message" style="display:none;"></div>
         <div class="detail-card card animate-scale-in">
           <div class="detail-header">
             <div>
               <h1 class="detail-title">${task.title}</h1>
               <div class="detail-badges">
                 <span class="badge ${status.className}">${status.label}</span>
-                <span class="task-card-meta-item">${svgIcon('M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', 'w-4 h-4')} ${task.timeAgo}</span>
-                <span class="task-card-meta-item">${svgIcon('M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z', 'w-4 h-4')} ${task.views} 次浏览</span>
+                <span class="task-card-meta-item">${svgIcon('M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', 'w-4 h-4')} ${formatTimeAgo(task.createdAt)}</span>
+                <span class="task-card-meta-item">${svgIcon('M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z', 'w-4 h-4')} ${task.views || 0} 次浏览</span>
               </div>
             </div>
             <div class="detail-reward">
@@ -327,22 +496,21 @@ function renderTaskDetailPage() {
           </div>
           <div class="detail-section">
             <h2 class="detail-section-title">任务描述</h2>
-            <p class="detail-desc">${task.description}</p>
+            <p class="detail-desc">${task.description || '无描述'}</p>
           </div>
           <div class="detail-section">
             <h2 class="detail-section-title">发布者信息</h2>
             <div class="detail-publisher">
               <div class="detail-publisher-avatar gradient-campus">${initial}</div>
               <div>
-                <div class="detail-publisher-name">${task.publisher}</div>
-                <div class="detail-publisher-level">Lv.5 · 公会成员</div>
+                <div class="detail-publisher-name">${task.publisherNickname}</div>
+                <div class="detail-publisher-level">Lv.${task.publisherGuildLevel || 1} · 公会成员</div>
               </div>
             </div>
           </div>
           <div class="detail-section">
             <div class="detail-actions">
               ${actionHtml}
-              <button class="btn-secondary">${svgIcon('M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 103 3m0 0a3 3 0 00-3-3m0 3h2.5M12 18v-6m0 0V6m0 6H9.5m2.5 0H15')}</button>
             </div>
           </div>
         </div>
@@ -368,6 +536,7 @@ function renderPublishPage() {
           <p>填写任务信息，等待冒险者接取</p>
         </div>
         <div class="publish-card card animate-slide-up">
+          <div id="publish-error" class="error-message" style="display:none;"></div>
           <form class="publish-form" onsubmit="handlePublish(event)">
             <div>
               <label class="publish-label">任务标题</label>
@@ -377,7 +546,7 @@ function renderPublishPage() {
               <label class="publish-label">任务分类</label>
               <div class="publish-categories">
                 ${categories.map(cat => `
-                  <button type="button" class="publish-category-btn" onclick="selectCategory(this,'${cat.value}')">
+                  <button type="button" class="publish-category-btn" data-action="selectCategory" data-category="${cat.value}">
                     ${svgIcon(cat.icon)} <span>${cat.label}</span>
                   </button>
                 `).join('')}
@@ -385,7 +554,7 @@ function renderPublishPage() {
             </div>
             <div>
               <label class="publish-label">详细描述</label>
-              <textarea id="pub-desc" class="input-field publish-textarea" placeholder="详细描述任务内容、要求、时间地点等信息" required></textarea>
+              <textarea id="pub-desc" class="input-field publish-textarea" placeholder="详细描述任务内容、要求、时间地点等信息"></textarea>
             </div>
             <div>
               <label class="publish-label">悬赏积分</label>
@@ -393,14 +562,14 @@ function renderPublishPage() {
                 <input type="number" id="pub-reward" class="input-field publish-reward-input" placeholder="10" min="1" required>
                 <span class="publish-reward-label">积分</span>
                 <div class="publish-reward-presets">
-                  <button type="button" class="publish-reward-preset" onclick="setReward(10)">10</button>
-                  <button type="button" class="publish-reward-preset" onclick="setReward(20)">20</button>
-                  <button type="button" class="publish-reward-preset" onclick="setReward(50)">50</button>
+                  <button type="button" class="publish-reward-preset" data-action="setReward" data-value="10">10</button>
+                  <button type="button" class="publish-reward-preset" data-action="setReward" data-value="20">20</button>
+                  <button type="button" class="publish-reward-preset" data-action="setReward" data-value="50">50</button>
                 </div>
               </div>
             </div>
             <div class="publish-actions">
-              <button type="button" class="btn-secondary" onclick="navigate('dashboard')">取消</button>
+              <button type="button" class="btn-secondary" data-action="navigate" data-page="dashboard">取消</button>
               <button type="submit" class="btn-primary">发布任务</button>
             </div>
           </form>
@@ -410,21 +579,23 @@ function renderPublishPage() {
   `;
 }
 
-function renderProfilePage() {
+async function renderProfilePage() {
   const user = state.user;
-  const level = user?.level || 1;
+  const level = user?.guildLevel || 1;
   const levelName = levelNames[Math.min(level - 1, levelNames.length - 1)];
   const initial = user?.username?.charAt(0).toUpperCase() || 'U';
   const activeTab = state.profileTab || 'published';
-  const stats = [
-    { label: '发布任务', value: '12', color: 'var(--campus-600)' },
-    { label: '完成任务', value: '47', color: 'var(--leaf-600)' },
-    { label: '获得积分', value: '320', color: 'var(--amber-600)' },
-    { label: '信誉评分', value: '4.8', color: 'var(--purple-600)' },
-  ];
-  const publishedTasks = state.tasks.slice(0, 3);
-  const acceptedTasks = state.tasks.filter(t => t.status === 'IN_PROGRESS').slice(0, 3);
-  const currentTasks = activeTab === 'published' ? publishedTasks : acceptedTasks;
+
+  let myTasks = [];
+  try {
+    const result = activeTab === 'published'
+      ? await apiTasks.myPublished()
+      : await apiTasks.myAccepted();
+    myTasks = result.items || [];
+  } catch (e) {
+    console.error(e);
+  }
+
   return `
     <div class="page">
       ${renderNavbar()}
@@ -447,9 +618,8 @@ function renderProfilePage() {
                   <h1 class="profile-name">${user?.username || '用户'}</h1>
                   <span class="profile-level-badge">Lv.${level} · ${levelName}</span>
                 </div>
-                <p class="profile-joined">注册时间：2026年4月</p>
+                <p class="profile-joined">积分: ${user?.points || 0} | 经验: ${user?.experience || 0}</p>
               </div>
-              <button class="btn-secondary profile-logout" onclick="logout()">退出登录</button>
             </div>
             <div class="profile-exp">
               <div class="profile-exp-header">
@@ -462,23 +632,15 @@ function renderProfilePage() {
             </div>
           </div>
         </div>
-        <div class="profile-stats-grid">
-          ${stats.map((s, i) => `
-            <div class="profile-stat-card card animate-slide-up" style="animation-delay:${i*0.1}s">
-              <div class="profile-stat-value" style="color:${s.color}">${s.value}</div>
-              <div class="profile-stat-label">${s.label}</div>
-            </div>
-          `).join('')}
-        </div>
         <div class="profile-tabs-card card animate-slide-up" style="animation-delay:0.4s">
           <div class="profile-tabs">
-            <button class="profile-tab ${activeTab === 'published' ? 'active' : ''}" onclick="state.profileTab='published';render();">我发布的</button>
-            <button class="profile-tab ${activeTab === 'accepted' ? 'active' : ''}" onclick="state.profileTab='accepted';render();">我接取的</button>
+            <button class="profile-tab ${activeTab === 'published' ? 'active' : ''}" data-action="setProfileTab" data-tab="published">我发布的</button>
+            <button class="profile-tab ${activeTab === 'accepted' ? 'active' : ''}" data-action="setProfileTab" data-tab="accepted">我接取的</button>
           </div>
           <div class="profile-tab-content">
-            ${currentTasks.length > 0 ? `
+            ${myTasks.length > 0 ? `
               <div class="tasks-grid">
-                ${currentTasks.map(task => renderTaskCard(task)).join('')}
+                ${myTasks.map(task => renderTaskCard(task)).join('')}
               </div>
             ` : `
               <div class="profile-empty">暂无任务记录</div>
@@ -490,31 +652,55 @@ function renderProfilePage() {
   `;
 }
 
-function render() {
+async function render() {
   const app = document.getElementById('app');
   let html = '';
   switch (state.currentPage) {
     case 'login': html = renderLoginPage(); break;
     case 'register': html = renderRegisterPage(); break;
-    case 'dashboard': html = renderDashboardPage(); break;
-    case 'taskDetail': html = renderTaskDetailPage(); break;
+    case 'dashboard': html = await renderDashboardPage(); break;
+    case 'taskDetail': html = await renderTaskDetailPage(); break;
     case 'publish': html = renderPublishPage(); break;
-    case 'profile': html = renderProfilePage(); break;
+    case 'profile': html = await renderProfilePage(); break;
     default: html = renderLoginPage();
   }
   app.innerHTML = html;
   window.scrollTo(0, 0);
+  bindEvents();
 }
 
-function handleLogin(e) {
-  e.preventDefault();
-  const username = document.getElementById('login-username').value;
-  login(username, '');
+async function handleLogin(e) {
+  if (e) {
+    e.preventDefault();
+  }
+  const usernameEl = document.getElementById('login-username');
+  const passwordEl = document.getElementById('login-password');
+  const errorEl = document.getElementById('login-error');
+  
+  if (!usernameEl || !passwordEl) {
+    return;
+  }
+  
+  const username = usernameEl.value;
+  const password = passwordEl.value;
+  
+  try {
+    const response = await apiAuth.login(username, password);
+    saveUser(response.user, response.token);
+    navigate('dashboard');
+    await loadTasks();
+  } catch (err) {
+    console.error('Login error:', err);
+    errorEl.textContent = err.message;
+    errorEl.style.display = 'block';
+    setTimeout(function() { errorEl.style.display = 'none'; }, 3000);
+  }
 }
 
-function handleRegister(e) {
+async function handleRegister(e) {
   e.preventDefault();
   const username = document.getElementById('reg-username').value;
+  const nickname = document.getElementById('reg-nickname').value;
   const password = document.getElementById('reg-password').value;
   const confirm = document.getElementById('reg-confirm').value;
   const errorEl = document.getElementById('register-error');
@@ -528,32 +714,61 @@ function handleRegister(e) {
     errorEl.style.display = 'block';
     return;
   }
-  register(username, password);
-}
-
-function handleAcceptTask(id) {
-  const task = state.tasks.find(t => t.id === id);
-  if (task) {
-    task.status = 'IN_PROGRESS';
-    render();
+  try {
+    await apiAuth.register(username, password, nickname);
+    navigate('login');
+    showError('注册成功，请登录', 'login-error');
+  } catch (err) {
+    errorEl.textContent = err.message;
+    errorEl.style.display = 'block';
   }
 }
 
-function handleCompleteTask(id) {
-  const task = state.tasks.find(t => t.id === id);
-  if (task) {
-    task.status = 'COMPLETED';
-    if (state.user) {
-      state.user.points = (state.user.points || 0) + task.reward;
-      localStorage.setItem('user', JSON.stringify(state.user));
-    }
+async function handleAcceptTask(taskId) {
+  try {
+    await apiTasks.accept(taskId);
+    state.currentTask = await apiTasks.getDetail(taskId);
     render();
+    showError('接取成功！', 'detail-message');
+  } catch (e) {
+    render();
+    showError(e.message || '接取失败', 'detail-message');
+  }
+}
+
+async function handleCompleteTask(taskId) {
+  try {
+    await apiTasks.complete(taskId);
+    state.currentTask = await apiTasks.getDetail(taskId);
+    // 刷新用户信息（积分变动）
+    const me = await api.get('/auth/me');
+    saveUser(me, state.token);
+    render();
+    showError('任务已完成，积分已结算！', 'detail-message');
+  } catch (e) {
+    render();
+    showError(e.message || '操作失败', 'detail-message');
+  }
+}
+
+async function handleCancelTask(taskId) {
+  try {
+    await apiTasks.cancel(taskId);
+    // 刷新用户信息（积分退还）
+    const me = await api.get('/auth/me');
+    saveUser(me, state.token);
+    navigate('dashboard');
+    await loadTasks();
+  } catch (e) {
+    render();
+    showError(e.message || '取消失败', 'detail-message');
   }
 }
 
 function selectCategory(btn, value) {
   document.querySelectorAll('.publish-category-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
+  state.selectedCategory = value;
 }
 
 function setReward(amount) {
@@ -563,23 +778,38 @@ function setReward(amount) {
   });
 }
 
-function handlePublish(e) {
+async function handlePublish(e) {
   e.preventDefault();
   const title = document.getElementById('pub-title').value;
-  const desc = document.getElementById('pub-desc').value;
+  const description = document.getElementById('pub-desc').value;
   const reward = parseInt(document.getElementById('pub-reward').value);
-  const newTask = {
-    id: state.tasks.length + 1,
-    title,
-    description: desc,
-    publisher: state.user.username,
-    reward,
-    status: 'PENDING',
-    timeAgo: '刚刚',
-    views: 0,
-  };
-  state.tasks.unshift(newTask);
-  navigate('dashboard');
+  const category = state.selectedCategory || 'other';
+  const errorEl = document.getElementById('publish-error');
+  try {
+    await apiTasks.publish(title, description, category, reward);
+    navigate('dashboard');
+    await loadTasks();
+  } catch (err) {
+    errorEl.textContent = err.message;
+    errorEl.style.display = 'block';
+  }
 }
 
-init();
+function toggleUserMenu() {
+  state.showUserMenu = !state.showUserMenu;
+  render();
+}
+
+function openTaskDetail(id) {
+  viewTaskDetail(id);
+}
+
+function doLogin() {
+  handleLogin({preventDefault: function() {}}).catch(function(err) {
+    console.error('Login error:', err);
+  });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  init();
+});

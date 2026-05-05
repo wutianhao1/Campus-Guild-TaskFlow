@@ -10,8 +10,12 @@ public class TaskPublishRequest {
 
     private String description;
 
+    private String category;
+
     @Positive(message = "悬赏积分必须大于 0")
     private int reward;
+
+    private Integer deadlineDays;
 
     public String getTitle() { return title; }
     public void setTitle(String title) { this.title = title; }
@@ -19,6 +23,12 @@ public class TaskPublishRequest {
     public String getDescription() { return description; }
     public void setDescription(String description) { this.description = description; }
 
+    public String getCategory() { return category; }
+    public void setCategory(String category) { this.category = category; }
+
     public int getReward() { return reward; }
     public void setReward(int reward) { this.reward = reward; }
+
+    public Integer getDeadlineDays() { return deadlineDays; }
+    public void setDeadlineDays(Integer deadlineDays) { this.deadlineDays = deadlineDays; }
 }

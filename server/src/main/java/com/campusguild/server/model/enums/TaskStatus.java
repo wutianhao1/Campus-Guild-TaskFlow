@@ -3,7 +3,8 @@ package com.campusguild.server.model.enums;
 public enum TaskStatus {
     PENDING("待接取"),
     IN_PROGRESS("进行中"),
-    COMPLETED("已完成");
+    COMPLETED("已完成"),
+    CANCELLED("已取消");
 
     private final String displayName;
 

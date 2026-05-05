@@ -1,7 +1,9 @@
 package com.campusguild.server.service;
 
+import com.campusguild.server.config.JwtTokenProvider;
 import com.campusguild.server.exception.BusinessException;
 import com.campusguild.server.model.dto.LoginRequest;
+import com.campusguild.server.model.dto.LoginResponse;
 import com.campusguild.server.model.dto.RegisterRequest;
 import com.campusguild.server.model.dto.UserDTO;
 import com.campusguild.server.model.entity.User;
@@ -17,9 +19,11 @@ import java.util.Base64;
 public class AuthService {
 
     private final UserRepository userRepository;
+    private final JwtTokenProvider jwtTokenProvider;
 
-    public AuthService(UserRepository userRepository) {
+    public AuthService(UserRepository userRepository, JwtTokenProvider jwtTokenProvider) {
         this.userRepository = userRepository;
+        this.jwtTokenProvider = jwtTokenProvider;
     }
 
     public UserDTO register(RegisterRequest request) {
@@ -35,14 +39,14 @@ public class AuthService {
         user.setPasswordHash(salt + "$" + passwordHash);
         user.setNickname(request.getNickname());
         user.setGuildLevel(1);
-        user.setPoints(0);
+        user.setPoints(100); // Give initial points so users can publish tasks
         user.setExperience(0);
 
         user = userRepository.save(user);
         return UserDTO.fromEntity(user);
     }
 
-    public UserDTO login(LoginRequest request) {
+    public LoginResponse login(LoginRequest request) {
         User user = userRepository.findByUsername(request.getUsername())
                 .orElseThrow(() -> new BusinessException("用户名或密码错误"));
 
@@ -56,7 +60,8 @@ public class AuthService {
             throw new BusinessException("用户名或密码错误");
         }
 
-        return UserDTO.fromEntity(user);
+        String token = jwtTokenProvider.generateToken(user.getId(), user.getUsername());
+        return new LoginResponse(token, UserDTO.fromEntity(user));
     }
 
     private String generateSalt() {
@@ -75,5 +80,11 @@ public class AuthService {
         } catch (NoSuchAlgorithmException e) {
             throw new RuntimeException("SHA-256 not available", e);
         }
+    }
+
+    public UserDTO getUserById(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException("用户不存在"));
+        return UserDTO.fromEntity(user);
     }
 }

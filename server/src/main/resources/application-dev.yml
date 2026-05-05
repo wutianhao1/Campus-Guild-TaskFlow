@@ -2,9 +2,6 @@ server:
   port: 8080
 
 spring:
-  profiles:
-    active: dev
-
   datasource:
     url: jdbc:h2:file:./data/campusguild;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
     driver-class-name: org.h2.Driver
@@ -19,22 +16,22 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update
-    show-sql: true
+    show-sql: false
     properties:
       hibernate:
         format_sql: true
         dialect: org.hibernate.dialect.H2Dialect
 
 jwt:
-  secret: ${JWT_SECRET}
+  secret: ${JWT_SECRET:Y2FtcHVzR3VhcmRUYXNrRmxvdzEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE=}
   expiration: 86400000
 
 springdoc:
   api-docs:
     path: /api-docs
   swagger-ui:
-    path: /swagger-ui.html
+    enabled: false
 
 logging:
   level:
-    com.campusguild: DEBUG
+    com.campusguild: INFO

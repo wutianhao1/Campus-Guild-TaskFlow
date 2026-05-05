@@ -43,9 +43,13 @@ public class TaskService {
         Task task = new Task();
         task.setTitle(request.getTitle());
         task.setDescription(request.getDescription());
+        task.setCategory(request.getCategory());
         task.setReward(request.getReward());
+        task.setViews(0);
         task.setStatus(TaskStatus.PENDING);
         task.setPublisher(user);
+        int deadlineDays = request.getDeadlineDays() != null ? request.getDeadlineDays() : 7;
+        task.setDeadline(java.time.LocalDateTime.now().plusDays(deadlineDays));
 
         task = taskRepository.save(task);
 
@@ -55,12 +59,14 @@ public class TaskService {
         return TaskDTO.fromEntity(task);
     }
 
-    public PageResult<TaskDTO> browseTasks(int page, int pageSize, String keyword) {
+    public PageResult<TaskDTO> browseTasks(int page, int pageSize, String keyword, String category) {
         Pageable pageable = PageRequest.of(page, pageSize);
         Page<Task> taskPage;
 
         if (keyword != null && !keyword.isBlank()) {
             taskPage = taskRepository.findByTitleContainingIgnoreCaseOrderByCreatedAtDesc(keyword, pageable);
+        } else if (category != null && !category.isBlank()) {
+            taskPage = taskRepository.findByCategoryAndStatusOrderByCreatedAtDesc(category, TaskStatus.PENDING, pageable);
         } else {
             taskPage = taskRepository.findByStatusOrderByCreatedAtDesc(TaskStatus.PENDING, pageable);
         }
@@ -95,7 +101,7 @@ public class TaskService {
         return TaskDTO.fromEntity(task);
     }
 
-    @Transactional
+@Transactional
     public TaskDTO confirmComplete(Long taskId, Long userId) {
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new BusinessException("任务不存在"));
@@ -115,6 +121,63 @@ public class TaskService {
         // 结算：接单者获得赏金和经验值
         pointsService.settleReward(task.getAccepter(), task.getReward());
 
+        return TaskDTO.fromEntity(task);
+    }
+
+    @Transactional
+    public TaskDTO cancelTask(Long taskId, Long userId) {
+        Task task = taskRepository.findById(taskId)
+                .orElseThrow(() -> new BusinessException("任务不存在"));
+
+        if (!task.getPublisher().getId().equals(userId)) {
+            throw new BusinessException("只有发布者可以取消任务");
+        }
+
+        if (task.getStatus() == TaskStatus.COMPLETED) {
+            throw new BusinessException("已完成任务无法取消");
+        }
+
+        // 退还积分给发布者
+        pointsService.refundPoints(task.getPublisher(), task.getReward());
+
+        task.setStatus(TaskStatus.CANCELLED);
+        task = taskRepository.save(task);
+
+        return TaskDTO.fromEntity(task);
+    }
+
+    public PageResult<TaskDTO> getMyPublishedTasks(Long userId, int page, int pageSize) {
+        Pageable pageable = PageRequest.of(page, pageSize);
+        Page<Task> taskPage = taskRepository.findByPublisherIdOrderByCreatedAtDesc(userId, pageable);
+
+        return new PageResult<>(
+                taskPage.getContent().stream().map(TaskDTO::fromEntity).toList(),
+                page, pageSize, taskPage.getTotalElements()
+        );
+    }
+
+    public PageResult<TaskDTO> getMyAcceptedTasks(Long userId, int page, int pageSize) {
+        Pageable pageable = PageRequest.of(page, pageSize);
+        Page<Task> taskPage = taskRepository.findByAccepterIdOrderByCreatedAtDesc(userId, pageable);
+
+        return new PageResult<>(
+                taskPage.getContent().stream().map(TaskDTO::fromEntity).toList(),
+                page, pageSize, taskPage.getTotalElements()
+        );
+    }
+
+    public TaskDTO getTaskDetail(Long taskId) {
+        Task task = taskRepository.findById(taskId)
+                .orElseThrow(() -> new BusinessException("任务不存在"));
+        return TaskDTO.fromEntity(task);
+    }
+
+    @Transactional
+    public TaskDTO incrementViews(Long taskId) {
+        Task task = taskRepository.findById(taskId)
+                .orElseThrow(() -> new BusinessException("任务不存在"));
+        task.setViews(task.getViews() + 1);
+task = taskRepository.save(task);
         return TaskDTO.fromEntity(task);
     }
 }

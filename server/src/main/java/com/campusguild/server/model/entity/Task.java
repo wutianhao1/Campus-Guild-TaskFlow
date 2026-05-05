@@ -18,8 +18,15 @@ public class Task {
     @Column(columnDefinition = "TEXT")
     private String description;
 
+    @Column(length = 20)
+    private String category;
+
     @Column(nullable = false)
     private Integer reward;
+
+    private Integer views = 0;
+
+    private LocalDateTime deadline;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
@@ -60,6 +67,15 @@ public class Task {
 
     public String getDescription() { return description; }
     public void setDescription(String description) { this.description = description; }
+
+    public String getCategory() { return category; }
+    public void setCategory(String category) { this.category = category; }
+
+    public Integer getViews() { return views; }
+    public void setViews(Integer views) { this.views = views; }
+
+    public LocalDateTime getDeadline() { return deadline; }
+    public void setDeadline(LocalDateTime deadline) { this.deadline = deadline; }
 
     public Integer getReward() { return reward; }
     public void setReward(Integer reward) { this.reward = reward; }

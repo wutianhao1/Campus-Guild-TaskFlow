@@ -123,7 +123,7 @@ img { max-width: 100%; display: block; }
 .navbar-user-avatar { width: 2rem; height: 2rem; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 0.875rem; font-weight: 600; }
 .navbar-user-name { font-size: 0.875rem; font-weight: 500; color: var(--gray-700); display: none; }
 @media (min-width: 640px) { .navbar-user-name { display: block; } }
-.navbar-user-menu { position: absolute; right: 0; top: 100%; margin-top: 0.5rem; width: 12rem; background: #fff; border-radius: var(--radius-xl); box-shadow: var(--shadow-lg); border: 1px solid var(--gray-100); padding: 0.5rem 0; animation: scaleIn 0.2s ease-out; }
+.navbar-user-menu { position: absolute; right: 0; top: 100%; margin-top: 0.5rem; width: 12rem; background: #fff; border-radius: var(--radius-xl); box-shadow: var(--shadow-lg); border: 1px solid var(--gray-100); padding: 0.5rem 0; animation: scaleIn 0.2s ease-out; z-index: 100; }
 .navbar-user-menu-header { padding: 0.5rem 1rem; border-bottom: 1px solid var(--gray-100); }
 .navbar-user-menu-name { font-size: 0.875rem; font-weight: 600; color: var(--gray-900); }
 .navbar-user-menu-level { font-size: 0.75rem; color: var(--gray-500); }
@@ -182,7 +182,8 @@ img { max-width: 100%; display: block; }
 @media (min-width: 768px) { .tasks-grid { grid-template-columns: repeat(2, 1fr); } }
 @media (min-width: 1024px) { .tasks-grid { grid-template-columns: repeat(3, 1fr); } }
 
-.task-card { display: block; padding: 1.25rem; transition: all 0.3s; cursor: pointer; }
+.task-card { display: block; padding: 1.25rem; transition: all 0.3s; cursor: pointer; text-decoration: none; }
+a.task-card { color: inherit; }
 .task-card:hover { box-shadow: var(--shadow-md); border-color: var(--campus-200); }
 .task-card-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 0.75rem; }
 .task-card-title { font-weight: 600; color: var(--gray-900); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -198,6 +199,9 @@ img { max-width: 100%; display: block; }
 .task-card-meta { display: flex; align-items: center; gap: 1rem; margin-top: 0.75rem; font-size: 0.75rem; color: var(--gray-400); }
 .task-card-meta-item { display: flex; align-items: center; gap: 0.25rem; }
 .task-card-meta-item svg { width: 0.875rem; height: 0.875rem; }
+.task-card-btn { width: 100%; margin-top: 1rem; padding: 0.625rem; background: var(--campus-600); color: #fff; border: none; border-radius: var(--radius-lg); font-size: 0.875rem; font-weight: 500; cursor: pointer; }
+.task-card-btn:hover { background: var(--campus-700); }
+.task-card-btn:active { transform: scale(0.98); }
 
 .empty-state { padding: 3rem; text-align: center; }
 .empty-state svg { width: 4rem; height: 4rem; color: var(--gray-300); margin: 0 auto 1rem; }
