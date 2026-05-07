@@ -32,10 +32,12 @@ Campus Guild TaskFlow 是一个校园任务平台，采用"公会制" gamificati
 ```bash
 # Windows
 cd server
+set JWT_SECRET=your_base64_secret_key_here
 .\mvnw.cmd spring-boot:run
 
 # Linux/macOS
 cd server
+export JWT_SECRET=your_base64_secret_key_here
 ./mvnw spring-boot:run
 ```
 
