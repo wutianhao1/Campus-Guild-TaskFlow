@@ -206,6 +206,12 @@ function showError(message, elementId = 'error-message') {
   }
 }
 
+function escapeHtml(str) {
+  if (typeof str !== 'string') return str;
+  const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+  return str.replace(/[&<>"']/g, c => map[c]);
+}
+
 function svgIcon(path, className = 'w-5 h-5') {
   return `<svg class="${className}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="${path}"/></svg>`;
 }
@@ -228,7 +234,7 @@ function renderNavbar() {
     { page: 'publish', label: '发布悬赏', icon: 'M12 4v16m8-8H4' },
     { page: 'profile', label: '个人中心', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z' },
   ];
-  const initial = state.user.username?.charAt(0).toUpperCase() || 'U';
+  const initial = escapeHtml(state.user.username?.charAt(0).toUpperCase() || 'U');
   return `
     <nav class="navbar">
       <div class="container">
@@ -252,12 +258,12 @@ function renderNavbar() {
             <div class="navbar-user">
               <button class="navbar-user-btn" data-action="toggleUserMenu">
                 <div class="navbar-user-avatar gradient-campus">${initial}</div>
-                <span class="navbar-user-name">${state.user.username}</span>
+                <span class="navbar-user-name">${escapeHtml(state.user.username)}</span>
               </button>
               ${state.showUserMenu ? `
                 <div class="navbar-user-menu">
                   <div class="navbar-user-menu-header">
-                    <div class="navbar-user-menu-name">${state.user.username}</div>
+                    <div class="navbar-user-menu-name">${escapeHtml(state.user.username)}</div>
                     <div class="navbar-user-menu-level">Lv.${state.user.guildLevel || 1} · ${state.user.points || 0} 积分</div>
                   </div>
                   <button class="navbar-user-menu-item" data-action="navigate" data-page="profile">个人中心</button>
@@ -286,18 +292,18 @@ function renderNavbar() {
 
 function renderTaskCard(task) {
   const status = statusConfig[task.status] || statusConfig['待接取'];
-  const initial = task.publisherNickname?.charAt(0).toUpperCase() || 'U';
+  const initial = escapeHtml(task.publisherNickname?.charAt(0).toUpperCase() || 'U');
   return `
     <div class="task-card card animate-slide-up">
       <div class="task-card-header">
-        <h3 class="task-card-title">${task.title}</h3>
+        <h3 class="task-card-title">${escapeHtml(task.title)}</h3>
         <span class="badge ${status.className}">${status.label}</span>
       </div>
-      <p class="task-card-desc">${task.description || ''}</p>
+      <p class="task-card-desc">${escapeHtml(task.description || '')}</p>
       <div class="task-card-footer">
         <div class="task-card-publisher">
           <div class="task-card-avatar gradient-campus">${initial}</div>
-          <span class="task-card-publisher-name">${task.publisherNickname}</span>
+          <span class="task-card-publisher-name">${escapeHtml(task.publisherNickname)}</span>
         </div>
         <div class="task-card-reward">
           ${svgIcon('M10 2a1 1 0 011 1v1.323l3.954 1.582 1.599-.8a1 1 0 01.894 1.79l-1.233.616 1.738 5.42a1 1 0 01-.285 1.05A3.989 3.989 0 0115 15a3.989 3.989 0 01-2.667-1.019 1 1 0 01-.285-1.05l1.715-5.349L11 6.477V16h2a1 1 0 110 2H7a1 1 0 110-2h2V6.477L6.237 7.582l1.715 5.349a1 1 0 01-.285 1.05A3.989 3.989 0 015 15a3.989 3.989 0 01-2.667-1.019 1 1 0 01-.285-1.05l1.738-5.42-1.233-.617a1 1 0 01.894-1.788l1.599.799L9 4.323V3a1 1 0 011-1z', 'w-4 h-4')}
@@ -406,7 +412,7 @@ async function renderDashboardPage() {
           <div class="filter-bar-inner">
             <div class="search-wrapper">
               ${svgIcon('M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z', 'w-5 h-5')}
-              <input type="text" class="input-field search-input" placeholder="搜索任务..." value="${state.searchQuery}" oninput="state.searchQuery=this.value;loadTasks();">
+              <input type="text" class="input-field search-input" placeholder="搜索任务..." value="${escapeHtml(state.searchQuery)}" oninput="state.searchQuery=this.value;loadTasks();">
             </div>
             <div class="filter-buttons">
               ${filterBtns.map(btn => `
@@ -451,7 +457,7 @@ async function renderTaskDetailPage() {
     return renderDashboardPage();
   }
   const status = statusConfig[task.status];
-  const initial = task.publisherNickname?.charAt(0).toUpperCase() || 'U';
+  const initial = escapeHtml(task.publisherNickname?.charAt(0).toUpperCase() || 'U');
   let actionHtml = '';
   if (task.status === '待接取') {
     if (task.publisherId === state.user.id) {
@@ -470,7 +476,7 @@ async function renderTaskDetailPage() {
       actionHtml = `<div class="detail-progress">任务进行中...</div>`;
     }
   } else {
-    actionHtml = `<div class="detail-completed">${status?.label || task.status}</div>`;
+    actionHtml = `<div class="detail-completed">${escapeHtml(status?.label || task.status)}</div>`;
   }
   return `
     <div class="page">
@@ -481,7 +487,7 @@ async function renderTaskDetailPage() {
         <div class="detail-card card animate-scale-in">
           <div class="detail-header">
             <div>
-              <h1 class="detail-title">${task.title}</h1>
+              <h1 class="detail-title">${escapeHtml(task.title)}</h1>
               <div class="detail-badges">
                 <span class="badge ${status.className}">${status.label}</span>
                 <span class="task-card-meta-item">${svgIcon('M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', 'w-4 h-4')} ${formatTimeAgo(task.createdAt)}</span>
@@ -496,14 +502,14 @@ async function renderTaskDetailPage() {
           </div>
           <div class="detail-section">
             <h2 class="detail-section-title">任务描述</h2>
-            <p class="detail-desc">${task.description || '无描述'}</p>
+            <p class="detail-desc">${escapeHtml(task.description || '无描述')}</p>
           </div>
           <div class="detail-section">
             <h2 class="detail-section-title">发布者信息</h2>
             <div class="detail-publisher">
               <div class="detail-publisher-avatar gradient-campus">${initial}</div>
               <div>
-                <div class="detail-publisher-name">${task.publisherNickname}</div>
+                <div class="detail-publisher-name">${escapeHtml(task.publisherNickname)}</div>
                 <div class="detail-publisher-level">Lv.${task.publisherGuildLevel || 1} · 公会成员</div>
               </div>
             </div>
@@ -596,6 +602,9 @@ async function renderProfilePage() {
     console.error(e);
   }
 
+  const exp = user?.experience || 0;
+  const expThisLevel = exp - (level - 1) * 100;
+  const expPercent = Math.min(100, Math.max(0, (expThisLevel / 100) * 100));
   return `
     <div class="page">
       ${renderNavbar()}
@@ -615,19 +624,19 @@ async function renderProfilePage() {
               </div>
               <div class="profile-details">
                 <div class="profile-name-row">
-                  <h1 class="profile-name">${user?.username || '用户'}</h1>
+                  <h1 class="profile-name">${escapeHtml(user?.username || '用户')}</h1>
                   <span class="profile-level-badge">Lv.${level} · ${levelName}</span>
                 </div>
-                <p class="profile-joined">积分: ${user?.points || 0} | 经验: ${user?.experience || 0}</p>
+                <p class="profile-joined">积分: ${user?.points || 0} | 经验: ${exp}</p>
               </div>
             </div>
             <div class="profile-exp">
               <div class="profile-exp-header">
                 <span class="profile-exp-label">经验值</span>
-                <span class="profile-exp-value">${(level-1)*100+50} / ${level*100}</span>
+                <span class="profile-exp-value">${Math.max(0, expThisLevel)} / 100</span>
               </div>
               <div class="profile-exp-bar">
-                <div class="profile-exp-fill gradient-campus" style="width:50%"></div>
+                <div class="profile-exp-fill gradient-campus" style="width:${expPercent}%"></div>
               </div>
             </div>
           </div>

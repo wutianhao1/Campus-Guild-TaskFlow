@@ -6,5 +6,6 @@ server/target/
 *.class
 
 # 忽略打包后的 JS
-ui/js/bundle.js"data/*.db" 
-"server/data/*.db" 
+ui/js/bundle.js
+data/*.db
+server/data/*.db

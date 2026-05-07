@@ -23,7 +23,7 @@ spring:
         dialect: org.hibernate.dialect.H2Dialect
 
 jwt:
-  secret: ${JWT_SECRET:Y2FtcHVzR3VhcmRUYXNrRmxvdzEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE=}
+  secret: ${JWT_SECRET}
   expiration: 86400000
 
 springdoc:
