@@ -29,14 +29,12 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
     @Query("SELECT t FROM Task t WHERE t.status = :status AND t.deadline < :deadline")
     List<Task> findExpiredTasks(TaskStatus status, java.time.LocalDateTime deadline);
 
+    Page<Task> findAllByOrderByCreatedAtDesc(Pageable pageable);
+
     long countByStatus(TaskStatus status);
 
     @Modifying(clearAutomatically = true)
     @Query("UPDATE Task t SET t.status = :status, t.accepter = :accepter WHERE t.id = :taskId AND t.status = :expectedStatus")
     int tryAccept(@Param("taskId") Long taskId, @Param("accepter") User accepter,
                   @Param("status") TaskStatus status, @Param("expectedStatus") TaskStatus expectedStatus);
-
-    @Modifying
-    @Query("UPDATE Task t SET t.status = :status, t.accepter = null WHERE t.id = :id AND t.status = 'PENDING'")
-    int resetTaskStatus(Long id, TaskStatus status);
 }

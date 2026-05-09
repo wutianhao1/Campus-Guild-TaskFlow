@@ -29,6 +29,12 @@ public class User {
     @Column(nullable = false)
     private Integer experience = 0;
 
+    @Column(nullable = false, length = 20)
+    private String role = "USER";
+
+    @Column(nullable = false)
+    private Boolean banned = false;
+
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -68,6 +74,12 @@ public class User {
 
     public Integer getExperience() { return experience; }
     public void setExperience(Integer experience) { this.experience = experience; }
+
+    public String getRole() { return role; }
+    public void setRole(String role) { this.role = role; }
+
+    public Boolean getBanned() { return banned; }
+    public void setBanned(Boolean banned) { this.banned = banned; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }

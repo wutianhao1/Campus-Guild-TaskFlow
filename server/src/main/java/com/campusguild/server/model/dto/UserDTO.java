@@ -10,6 +10,8 @@ public class UserDTO {
     private Integer guildLevel;
     private Integer points;
     private Integer experience;
+    private String role;
+    private Boolean banned;
 
     public static UserDTO fromEntity(User user) {
         UserDTO dto = new UserDTO();
@@ -19,6 +21,8 @@ public class UserDTO {
         dto.setGuildLevel(user.getGuildLevel());
         dto.setPoints(user.getPoints());
         dto.setExperience(user.getExperience());
+        dto.setRole(user.getRole());
+        dto.setBanned(user.getBanned());
         return dto;
     }
 
@@ -39,4 +43,10 @@ public class UserDTO {
 
     public Integer getExperience() { return experience; }
     public void setExperience(Integer experience) { this.experience = experience; }
+
+    public String getRole() { return role; }
+    public void setRole(String role) { this.role = role; }
+
+    public Boolean getBanned() { return banned; }
+    public void setBanned(Boolean banned) { this.banned = banned; }
 }

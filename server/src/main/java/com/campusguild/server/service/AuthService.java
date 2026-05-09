@@ -10,20 +10,19 @@ import com.campusguild.server.model.entity.User;
 import com.campusguild.server.repository.UserRepository;
 import org.springframework.stereotype.Service;
 
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
-import java.util.Base64;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 @Service
 public class AuthService {
 
     private final UserRepository userRepository;
     private final JwtTokenProvider jwtTokenProvider;
+    private final BCryptPasswordEncoder passwordEncoder;
 
     public AuthService(UserRepository userRepository, JwtTokenProvider jwtTokenProvider) {
         this.userRepository = userRepository;
         this.jwtTokenProvider = jwtTokenProvider;
+        this.passwordEncoder = new BCryptPasswordEncoder();
     }
 
     public UserDTO register(RegisterRequest request) {
@@ -31,16 +30,14 @@ public class AuthService {
             throw new BusinessException("用户名已存在");
         }
 
-        String salt = generateSalt();
-        String passwordHash = hashPassword(request.getPassword(), salt);
-
         User user = new User();
         user.setUsername(request.getUsername());
-        user.setPasswordHash(salt + "$" + passwordHash);
+        user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
         user.setNickname(request.getNickname());
         user.setGuildLevel(1);
-        user.setPoints(100); // Give initial points so users can publish tasks
+        user.setPoints(100);
         user.setExperience(0);
+        user.setRole("USER");
 
         user = userRepository.save(user);
         return UserDTO.fromEntity(user);
@@ -50,36 +47,16 @@ public class AuthService {
         User user = userRepository.findByUsername(request.getUsername())
                 .orElseThrow(() -> new BusinessException("用户名或密码错误"));
 
-        String[] parts = user.getPasswordHash().split("\\$");
-        if (parts.length != 2) {
-            throw new BusinessException("账号数据异常");
-        }
-
-        String inputHash = hashPassword(request.getPassword(), parts[0]);
-        if (!inputHash.equals(parts[1])) {
+        if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
             throw new BusinessException("用户名或密码错误");
         }
 
-        String token = jwtTokenProvider.generateToken(user.getId(), user.getUsername());
-        return new LoginResponse(token, UserDTO.fromEntity(user));
-    }
-
-    private String generateSalt() {
-        SecureRandom random = new SecureRandom();
-        byte[] salt = new byte[16];
-        random.nextBytes(salt);
-        return Base64.getEncoder().encodeToString(salt);
-    }
-
-    private String hashPassword(String password, String salt) {
-        try {
-            MessageDigest md = MessageDigest.getInstance("SHA-256");
-            md.update(salt.getBytes());
-            byte[] hashed = md.digest(password.getBytes());
-            return Base64.getEncoder().encodeToString(hashed);
-        } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException("SHA-256 not available", e);
+        if (user.getBanned()) {
+            throw new BusinessException("账号已被封禁");
         }
+
+        String token = jwtTokenProvider.generateToken(user.getId(), user.getUsername(), user.getRole());
+        return new LoginResponse(token, UserDTO.fromEntity(user));
     }
 
     public UserDTO getUserById(Long userId) {

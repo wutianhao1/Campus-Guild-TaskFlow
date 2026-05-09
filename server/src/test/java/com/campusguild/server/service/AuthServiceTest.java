@@ -55,6 +55,8 @@ class AuthServiceTest {
         testUser.setGuildLevel(1);
         testUser.setPoints(0);
         testUser.setExperience(0);
+        testUser.setRole("USER");
+        testUser.setBanned(false);
         testUser.setPasswordHash("salt$hash");
     }
 
@@ -98,7 +100,7 @@ class AuthServiceTest {
         testUser.setPasswordHash("salt$" + passwordHash);
 
         when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(testUser));
-        when(jwtTokenProvider.generateToken(1L, "testuser")).thenReturn("jwt-token");
+        when(jwtTokenProvider.generateToken(1L, "testuser", "USER")).thenReturn("jwt-token");
 
         LoginResponse result = authService.login(loginRequest);
 
