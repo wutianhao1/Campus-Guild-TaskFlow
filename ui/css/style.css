@@ -299,3 +299,29 @@ a.task-card { color: inherit; }
 .profile-tab.active::after { content: ''; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: 3rem; height: 0.125rem; background: var(--campus-600); border-radius: 9999px; }
 .profile-tab-content { padding: 1.5rem; }
 .profile-empty { padding: 3rem; text-align: center; color: var(--gray-500); }
+
+.admin-filter-bar { display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; }
+
+.admin-table-card { overflow: hidden; }
+.admin-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+.admin-table thead { background: var(--gray-50); }
+.admin-table th { padding: 0.75rem 1rem; text-align: left; font-weight: 600; color: var(--gray-600); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap; }
+.admin-table td { padding: 0.75rem 1rem; border-top: 1px solid var(--gray-100); color: var(--gray-700); }
+.admin-table tbody tr:hover { background: var(--gray-50); }
+.admin-table-id { color: var(--gray-400); font-size: 0.75rem; width: 3rem; }
+.admin-table-username { font-weight: 600; color: var(--gray-900); }
+.admin-table-title { max-width: 12rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.admin-table-empty { text-align: center; padding: 2rem !important; color: var(--gray-400); }
+.admin-role-badge { display: inline-flex; padding: 0.125rem 0.5rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 500; background: var(--gray-100); color: var(--gray-600); }
+.admin-role-badge.admin-role-admin { background: var(--campus-100); color: var(--campus-700); }
+.admin-action-btn { padding: 0.25rem 0.75rem; border-radius: var(--radius-lg); font-size: 0.75rem; font-weight: 500; cursor: pointer; transition: all 0.2s; }
+.admin-action-ban { background: var(--red-50); color: var(--red-600); border: 1px solid var(--red-100); }
+.admin-action-ban:hover { background: var(--red-100); }
+.admin-action-unban { background: var(--green-50); color: var(--green-700); border: 1px solid var(--green-100); }
+.admin-action-unban:hover { background: var(--green-100); }
+.admin-action-delete { background: var(--red-50); color: var(--red-600); border: 1px solid var(--red-100); }
+.admin-action-delete:hover { background: var(--red-100); }
+.admin-action-na { color: var(--gray-400); font-size: 0.75rem; }
+.admin-pagination { display: flex; align-items: center; justify-content: center; gap: 1rem; padding: 1rem; border-top: 1px solid var(--gray-100); }
+.admin-pagination-info { font-size: 0.875rem; color: var(--gray-500); }
+.admin-pagination .filter-btn:disabled { opacity: 0.4; cursor: not-allowed; }

@@ -13,6 +13,13 @@ const state = {
   page: 0,
   totalPages: 0,
   loading: false,
+  adminTab: 'users',
+  adminUserPage: 0,
+  adminTaskPage: 0,
+  adminTaskStatus: '',
+  adminUsersData: { items: [], totalPages: 0 },
+  adminTasksData: { items: [], totalPages: 0 },
+  adminStats: null,
 };
 
 const api = {
@@ -48,6 +55,29 @@ const apiAuth = {
   },
   register(username, password, nickname) {
     return api.post('/auth/register', { username, password, nickname });
+  },
+};
+
+const apiAdmin = {
+  getUsers(page = 0, pageSize = 10) {
+    return api.get(`/admin/users?page=${page}&pageSize=${pageSize}`);
+  },
+  banUser(userId) {
+    return api.request(`/admin/users/${userId}/ban`, { method: 'PUT' });
+  },
+  unbanUser(userId) {
+    return api.request(`/admin/users/${userId}/unban`, { method: 'PUT' });
+  },
+  getTasks(page = 0, pageSize = 10, status = '') {
+    let url = `/admin/tasks?page=${page}&pageSize=${pageSize}`;
+    if (status) url += `&status=${status}`;
+    return api.get(url);
+  },
+  deleteTask(taskId) {
+    return api.request(`/admin/tasks/${taskId}`, { method: 'DELETE' });
+  },
+  getStats() {
+    return api.get('/admin/stats');
   },
 };
 
@@ -134,6 +164,24 @@ function bindEvents() {
         state.category = el.dataset.key;
         state.page = 0;
         loadTasks();
+      } else if (action === 'handleBanUser') {
+        handleBanUser(parseInt(el.dataset.id));
+      } else if (action === 'handleUnbanUser') {
+        handleUnbanUser(parseInt(el.dataset.id));
+      } else if (action === 'handleDeleteTask') {
+        handleDeleteTask(parseInt(el.dataset.id));
+      } else if (action === 'setAdminTab') {
+        state.adminTab = el.dataset.tab;
+        state.adminUserPage = 0;
+        state.adminTaskPage = 0;
+        render();
+      } else if (action === 'adminPage') {
+        state[el.dataset.key] = parseInt(el.dataset.page);
+        render();
+      } else if (action === 'adminFilterTasks') {
+        state.adminTaskStatus = el.dataset.status;
+        state.adminTaskPage = 0;
+        render();
       }
     });
   });
@@ -234,6 +282,9 @@ function renderNavbar() {
     { page: 'publish', label: '发布悬赏', icon: 'M12 4v16m8-8H4' },
     { page: 'profile', label: '个人中心', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z' },
   ];
+  if (state.user.role === 'ADMIN') {
+    navItems.push({ page: 'admin', label: '管理后台', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z' });
+  }
   const initial = escapeHtml(state.user.username?.charAt(0).toUpperCase() || 'U');
   return `
     <nav class="navbar">
@@ -661,6 +712,186 @@ async function renderProfilePage() {
   `;
 }
 
+async function renderAdminPage() {
+  if (!state.adminStats) {
+    try { state.adminStats = await apiAdmin.getStats(); } catch (e) { state.adminStats = {}; }
+  }
+  const stats = state.adminStats || {};
+  const activeTab = state.adminTab || 'users';
+  const statsCards = [
+    { key: 'totalUsers', label: '用户总数', color: 'var(--campus-500)', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z', bg: 'var(--campus-50)' },
+    { key: 'totalTasks', label: '任务总数', color: 'var(--leaf-500)', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2', bg: 'var(--green-50)' },
+    { key: 'pendingTasks', label: '待接取', color: 'var(--campus-600)', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', bg: 'var(--blue-50)' },
+    { key: 'completedTasks', label: '已完成', color: 'var(--leaf-600)', icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z', bg: 'var(--green-50)' },
+  ];
+
+  let tabContent = '';
+  if (activeTab === 'users') {
+    try {
+      const result = await apiAdmin.getUsers(state.adminUserPage);
+      state.adminUsersData = result;
+    } catch (e) { state.adminUsersData = { items: [], totalPages: 0 }; }
+    const users = state.adminUsersData.items || [];
+    tabContent = `
+      <div class="card admin-table-card animate-slide-up">
+        <table class="admin-table">
+          <thead><tr>
+            <th>ID</th><th>用户名</th><th>昵称</th><th>角色</th><th>等级</th><th>积分</th><th>状态</th><th>操作</th>
+          </tr></thead>
+          <tbody>
+            ${users.map(u => `
+              <tr>
+                <td class="admin-table-id">${u.id}</td>
+                <td class="admin-table-username">${escapeHtml(u.username)}</td>
+                <td>${escapeHtml(u.nickname || '')}</td>
+                <td><span class="admin-role-badge ${u.role === 'ADMIN' ? 'admin-role-admin' : ''}">${u.role === 'ADMIN' ? '管理员' : '用户'}</span></td>
+                <td>Lv.${u.guildLevel || 1}</td>
+                <td>${u.points || 0}</td>
+                <td><span class="badge ${u.banned ? 'badge-progress' : 'badge-completed'}">${u.banned ? '已封禁' : '正常'}</span></td>
+                <td>
+                  ${u.role !== 'ADMIN' ? (
+                    u.banned
+                      ? `<button class="admin-action-btn admin-action-unban" data-action="handleUnbanUser" data-id="${u.id}">解封</button>`
+                      : `<button class="admin-action-btn admin-action-ban" data-action="handleBanUser" data-id="${u.id}">封禁</button>`
+                  ) : '<span class="admin-action-na">-</span>'}
+                </td>
+              </tr>
+            `).join('')}
+            ${users.length === 0 ? '<tr><td colspan="8" class="admin-table-empty">暂无用户数据</td></tr>' : ''}
+          </tbody>
+        </table>
+        ${renderAdminPagination(state.adminUserPage, state.adminUsersData.totalPages || 0, 'adminUserPage', 'admin-prev-users', 'admin-next-users')}
+      </div>`;
+  } else {
+    const statusOptions = [
+      { value: '', label: '全部' },
+      { value: 'PENDING', label: '待接取' },
+      { value: 'IN_PROGRESS', label: '进行中' },
+      { value: 'COMPLETED', label: '已完成' },
+      { value: 'CANCELLED', label: '已取消' },
+    ];
+    try {
+      const result = await apiAdmin.getTasks(state.adminTaskPage, 10, state.adminTaskStatus);
+      state.adminTasksData = result;
+    } catch (e) { state.adminTasksData = { items: [], totalPages: 0 }; }
+    const tasks = state.adminTasksData.items || [];
+    tabContent = `
+      <div class="admin-filter-bar">
+        ${statusOptions.map(s => `
+          <button class="filter-btn ${state.adminTaskStatus === s.value ? 'active' : ''}" data-action="adminFilterTasks" data-status="${s.value}">${s.label}</button>
+        `).join('')}
+      </div>
+      <div class="card admin-table-card animate-slide-up">
+        <table class="admin-table">
+          <thead><tr>
+            <th>ID</th><th>标题</th><th>发布者</th><th>状态</th><th>赏金</th><th>截止日期</th><th>操作</th>
+          </tr></thead>
+          <tbody>
+            ${tasks.map(t => {
+              const st = statusConfig[t.status] || statusConfig['待接取'];
+              const dl = t.deadline ? new Date(t.deadline).toLocaleDateString('zh-CN') : '-';
+              return `
+                <tr>
+                  <td class="admin-table-id">${t.id}</td>
+                  <td class="admin-table-title" title="${escapeHtml(t.title)}">${escapeHtml(t.title)}</td>
+                  <td>${escapeHtml(t.publisherNickname || '')}</td>
+                  <td><span class="badge ${st.className}">${st.label}</span></td>
+                  <td>${t.reward}</td>
+                  <td>${dl}</td>
+                  <td>
+                    <button class="admin-action-btn admin-action-delete" data-action="handleDeleteTask" data-id="${t.id}">删除</button>
+                  </td>
+                </tr>`;
+            }).join('')}
+            ${tasks.length === 0 ? '<tr><td colspan="7" class="admin-table-empty">暂无任务数据</td></tr>' : ''}
+          </tbody>
+        </table>
+        ${renderAdminPagination(state.adminTaskPage, state.adminTasksData.totalPages || 0, 'adminTaskPage', 'admin-prev-tasks', 'admin-next-tasks')}
+      </div>`;
+  }
+
+  return `
+    <div class="page">
+      ${renderNavbar()}
+      <div class="container page-content">
+        <div class="dashboard-header animate-fade-in">
+          <h1>管理后台</h1>
+          <p>管理用户与任务</p>
+        </div>
+        <div id="admin-message" class="error-message" style="display:none;"></div>
+        <div class="stats-grid animate-slide-up" style="animation-delay:0.1s">
+          ${statsCards.map(c => `
+            <div class="stat-card card">
+              <div class="stat-icon" style="background:${c.bg}">${svgIcon(c.icon)}</div>
+              <div>
+                <div class="stat-value">${stats[c.key] ?? '-'}</div>
+                <div class="stat-label">${c.label}</div>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+        <div class="profile-tabs card animate-slide-up" style="animation-delay:0.2s; margin-bottom: 1rem;">
+          <div class="profile-tabs">
+            <button class="profile-tab ${activeTab === 'users' ? 'active' : ''}" data-action="setAdminTab" data-tab="users">用户管理</button>
+            <button class="profile-tab ${activeTab === 'tasks' ? 'active' : ''}" data-action="setAdminTab" data-tab="tasks">任务管理</button>
+          </div>
+        </div>
+        ${tabContent}
+      </div>
+    </div>
+  `;
+}
+
+function renderAdminPagination(page, totalPages, stateKey, prevId, nextId) {
+  if (totalPages <= 1) return '';
+  return `
+    <div class="admin-pagination">
+      <button class="filter-btn" data-action="adminPage" data-page="${page - 1}" data-key="${stateKey}" id="${prevId}" ${page <= 0 ? 'disabled' : ''}>上一页</button>
+      <span class="admin-pagination-info">第 ${page + 1} / ${totalPages} 页</span>
+      <button class="filter-btn" data-action="adminPage" data-page="${page + 1}" data-key="${stateKey}" id="${nextId}" ${page >= totalPages - 1 ? 'disabled' : ''}>下一页</button>
+    </div>`;
+}
+
+async function handleBanUser(userId) {
+  try {
+    await apiAdmin.banUser(userId);
+    await loadAdminUsers();
+    render();
+    showError('用户已封禁', 'admin-message');
+  } catch (e) { showError(e.message, 'admin-message'); }
+}
+
+async function handleUnbanUser(userId) {
+  try {
+    await apiAdmin.unbanUser(userId);
+    await loadAdminUsers();
+    render();
+    showError('用户已解封', 'admin-message');
+  } catch (e) { showError(e.message, 'admin-message'); }
+}
+
+async function handleDeleteTask(taskId) {
+  try {
+    await apiAdmin.deleteTask(taskId);
+    state.adminStats = await apiAdmin.getStats();
+    await loadAdminTasks();
+    render();
+    showError('任务已删除', 'admin-message');
+  } catch (e) { showError(e.message, 'admin-message'); }
+}
+
+async function loadAdminUsers() {
+  try {
+    state.adminUsersData = await apiAdmin.getUsers(state.adminUserPage);
+  } catch (e) {}
+}
+
+async function loadAdminTasks() {
+  try {
+    state.adminTasksData = await apiAdmin.getTasks(state.adminTaskPage, 10, state.adminTaskStatus);
+  } catch (e) {}
+}
+
 async function render() {
   const app = document.getElementById('app');
   let html = '';
@@ -671,6 +902,7 @@ async function render() {
     case 'taskDetail': html = await renderTaskDetailPage(); break;
     case 'publish': html = renderPublishPage(); break;
     case 'profile': html = await renderProfilePage(); break;
+    case 'admin': html = await renderAdminPage(); break;
     default: html = renderLoginPage();
   }
   app.innerHTML = html;
