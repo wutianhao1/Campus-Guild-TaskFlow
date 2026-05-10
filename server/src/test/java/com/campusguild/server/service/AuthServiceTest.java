@@ -14,6 +14,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 import java.util.Optional;
 
@@ -57,7 +58,7 @@ class AuthServiceTest {
         testUser.setExperience(0);
         testUser.setRole("USER");
         testUser.setBanned(false);
-        testUser.setPasswordHash("salt$hash");
+        testUser.setPasswordHash(new BCryptPasswordEncoder().encode("password123"));
     }
 
     @Test
@@ -91,13 +92,7 @@ class AuthServiceTest {
 
     @Test
     void login_Success() throws Exception {
-        // 预先计算正确的 hash: SHA-256(salt + password)
-        // salt="salt", password="password123"
-        java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
-        md.update("salt".getBytes());
-        byte[] hashed = md.digest("password123".getBytes());
-        String passwordHash = java.util.Base64.getEncoder().encodeToString(hashed);
-        testUser.setPasswordHash("salt$" + passwordHash);
+        testUser.setPasswordHash(new BCryptPasswordEncoder().encode("password123"));
 
         when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(testUser));
         when(jwtTokenProvider.generateToken(1L, "testuser", "USER")).thenReturn("jwt-token");
@@ -122,7 +117,7 @@ class AuthServiceTest {
 
     @Test
     void login_WrongPassword_ThrowsException() {
-        testUser.setPasswordHash("salt$wronghash");
+        testUser.setPasswordHash(new BCryptPasswordEncoder().encode("wrong_password"));
         when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(testUser));
 
         BusinessException exception = assertThrows(BusinessException.class, () -> {

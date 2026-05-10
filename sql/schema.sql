@@ -15,6 +15,8 @@ CREATE TABLE IF NOT EXISTS users (
     guild_level INT NOT NULL DEFAULT 1,
     points INT NOT NULL DEFAULT 0,
     experience INT NOT NULL DEFAULT 0,
+    role VARCHAR(20) NOT NULL DEFAULT 'USER',
+    banned BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT uk_users_username UNIQUE (username)
@@ -65,6 +67,8 @@ CREATE INDEX idx_users_guild_level ON users(guild_level);
 --     guild_level INT NOT NULL DEFAULT 1,
 --     points INT NOT NULL DEFAULT 0,
 --     experience INT NOT NULL DEFAULT 0,
+--     role VARCHAR(20) NOT NULL DEFAULT 'USER',
+--     banned BOOLEAN NOT NULL DEFAULT FALSE,
 --     created_at TIMESTAMP NOT NULL,
 --     updated_at TIMESTAMP NOT NULL
 -- );
