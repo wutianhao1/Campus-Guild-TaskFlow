@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 
 @Service
 public class AdminService {
@@ -34,8 +35,10 @@ public class AdminService {
     @PostConstruct
     @Transactional
     public void initAdmin() {
-        if (userRepository.findByUsername("admin").isEmpty()) {
-            BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
+        BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
+        Optional<User> existingAdmin = userRepository.findByUsername("admin");
+
+        if (existingAdmin.isEmpty()) {
             User admin = new User();
             admin.setUsername("admin");
             admin.setPasswordHash(encoder.encode("admin123"));
@@ -45,6 +48,12 @@ public class AdminService {
             admin.setPoints(0);
             admin.setExperience(0);
             userRepository.save(admin);
+        } else {
+            User admin = existingAdmin.get();
+            if (!admin.getPasswordHash().startsWith("$2a$")) {
+                admin.setPasswordHash(encoder.encode("admin123"));
+                userRepository.save(admin);
+            }
         }
     }
 
