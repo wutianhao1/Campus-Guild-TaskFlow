@@ -88,6 +88,12 @@ npx serve . -p 3000
 - 查看我发布的任务
 - 查看我接取的任务
 
+### 管理员功能
+- 系统统计面板（用户总数、任务总数、各状态任务数量）
+- 用户管理（分页查看、封禁/解封，管理员不可被封禁）
+- 任务管理（分页查看、按状态筛选、删除任务）
+- 默认管理员账号：`admin` / `admin123`（首次启动自动创建）
+
 ## 任务状态流转
 
 ```
@@ -116,6 +122,12 @@ npx serve . -p 3000
 | POST | /api/tasks/{id}/cancel | 取消任务 |
 | GET | /api/tasks/my/published | 我发布的任务 |
 | GET | /api/tasks/my/accepted | 我接取的任务 |
+| GET | /api/admin/stats | 系统统计 |
+| GET | /api/admin/users | 用户列表（分页） |
+| PUT | /api/admin/users/{id}/ban | 封禁用户 |
+| PUT | /api/admin/users/{id}/unban | 解封用户 |
+| GET | /api/admin/tasks | 任务列表（分页+筛选） |
+| DELETE | /api/admin/tasks/{id} | 删除任务 |
 
 ## 开发工具
 
@@ -166,7 +178,7 @@ Campus-Guild-TaskFlow/
 
 ## 配置说明
 
-###application.yml
+### application.yml
 
 ```yaml
 spring:
@@ -206,6 +218,16 @@ npx esbuild js/app.js --outfile=js/bundle.js --minify
 - `进行中` - 已被接取，等待确认
 - `已完成` - 已完成
 - `已取消` - 已取消
+
+### 数据库升级后启动报错
+
+如果出现 `Column "BANNED" not found` 或 `NULL not allowed` 错误，原因是旧数据库缺少新字段。
+删除旧的 H2 数据库文件后重启即可：
+
+```bash
+del server\data\campusguild.mv.db
+del server\data\campusguild.trace.db
+```
 
 ## 许可证
 
